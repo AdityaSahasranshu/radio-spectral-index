@@ -4,13 +4,16 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Citation
 
-If you use this code in your research, please cite:
+1. “New structures in radio galaxies with RAD@Home citizen science, GMRT and LOFAR radio 
+telescopes” Prasun Machado, et al. Aditya Sahasranshu (Co-Author). Recent Trends in Applied Physics 
+and Material Science (RAM 2024) - Sudhir Bhardwaj et al. (eds) 2026 Taylor & Francis Group, London, 
+ISBN 978-1-041-16452-4 (Conference proceedings)
 
 ```bibtex
 @software{radio_spectral_index_analysis,
-  author = {Your Name},
+  author = {Aditya Sahasranshu},
   title = {Radio Spectral Index Analysis Tool},
-  url = {https://github.com/yourusername/radio-spectral-index},
+  url = {https://github.com/AdityaSahasranshu/radio-spectral-index},
   version = {1.0.0},
   year = {2025}
 }
@@ -36,14 +39,13 @@ If you use this code in your research, please cite:
 ## Contact & Support
 
 ### Academic Contact
-- **Email**: your.email@university.edu
-- **Institution**: Your Department, Your University
-- **ORCID**: [Your ORCID ID](https://orcid.org/0000-0000-0000-0000)
+- **Email**: aditya1space96@gmail.com
+- **Institution**: Odisha University of Technology and Research, Bhubaneswar
+- **ORCID**: [ORCID ID]()
 
 ### Technical Support
-- **Issues**: [GitHub Issues Page](https://github.com/yourusername/radio-spectral-index/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/radio-spectral-index/discussions)
-- **Wiki**: [Project Wiki](https://github.com/yourusername/radio-spectral-index/wiki)
+- **Issues**: [GitHub Issues Page](hhttps://github.com/AdityaSahasranshu/radio-spectral-index)
+- **Discussions**: [GitHub Discussions](https://github.com/AdityaSahasranshu/radio-spectral-index/discussions)
 
 ---
 
@@ -65,12 +67,13 @@ The repository includes small cutouts from real radio surveys for immediate test
 
 - **`data/sample_vlass_cutout.fits`** - VLASS 3 GHz data (512×512 pixels, ~2 MB)
 - **`data/sample_lotss_cutout.fits`** - LoTSS 144 MHz data (512×512 pixels, ~2 MB)
+- These are only 2 examples of data that can used, but FITS Files from other surveys like RACS Mid/Low, VLA First, TGSS, NVSS, etc, can be used but some of the attributes needs to be changed directly in the code. 
 
 These files contain the same sky region and demonstrate the complete analysis workflow. See [`data/README_data.md`](data/README_data.md) for detailed information about the sample data.
 
 ## Features
 
-- **Multi-survey compatibility**: Designed for VLASS (3 GHz) and LoTSS (144 MHz) data
+- **Multi-survey compatibility**: Designed for data from Radio Surveys in FITS Format
 - **Automatic reprojection**: Handles coordinate system differences between surveys
 - **Beam convolution**: Convolves data to common angular resolution
 - **Noise handling**: Applies configurable flux density thresholds
@@ -91,7 +94,7 @@ reproject
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/radio-spectral-index.git
+git clone https://github.com/AdityaSahasranshu/radio-spectral-index
 cd radio-spectral-index
 
 # Install dependencies
@@ -130,7 +133,7 @@ Physical Interpretation:
 
 1. Clone this repository:
 ```bash
-git clone https://github.com/yourusername/radio-spectral-index.git
+git clone https://github.com/AdityaSahasranshu/radio-spectral-index
 cd radio-spectral-index
 ```
 
@@ -292,7 +295,7 @@ The sample region shows a mix of:
 - **Cause**: Incorrect frequency values, flux scaling issues, or calibration problems  
 - **Solution**: Verify survey frequencies, check flux units (Jy/beam), validate input data
 
-For additional support, please [open an issue](https://github.com/yourusername/radio-spectral-index/issues) with:
+For additional support, please [open an issue](https://github.com/AdityaSahasranshu/radio-spectral-index) with:
 - Error messages and stack traces
 - Sample data information (survey, region, file sizes)
 - System information (OS, Python version, package versions)
@@ -303,7 +306,7 @@ Contributions are welcome! Please follow these guidelines:
 
 ### Development Setup
 ```bash
-git clone https://github.com/yourusername/radio-spectral-index.git
+git clone https://github.com/AdityaSahasranshu/radio-spectral-index
 cd radio-spectral-index
 pip install -r requirements.txt
 ```
