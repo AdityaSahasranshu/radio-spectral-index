@@ -1,0 +1,4 @@
+numpy>=1.21.0
+astropy>=5.0
+radio-beam>=0.3.3
+reproject>=0.8.0
