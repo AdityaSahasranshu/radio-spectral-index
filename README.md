@@ -41,11 +41,11 @@ ISBN 978-1-041-16452-4 (Conference proceedings)
 ### Academic Contact
 - **Email**: aditya1space96@gmail.com
 - **Institution**: Odisha University of Technology and Research, Bhubaneswar
-- **ORCID**: [ORCID ID]()
+
 
 ### Technical Support
 - **Issues**: [GitHub Issues Page](hhttps://github.com/AdityaSahasranshu/radio-spectral-index)
-- **Discussions**: [GitHub Discussions](https://github.com/AdityaSahasranshu/radio-spectral-index/discussions)
+- **Discussions**:
 
 ---
 
@@ -65,8 +65,8 @@ This repository contains tools for calculating spectral indices between radio ob
 
 The repository includes small cutouts from real radio surveys for immediate testing:
 
-- **`data/sample_vlass_cutout.fits`** - VLASS 3 GHz data (512×512 pixels, ~2 MB)
-- **`data/sample_lotss_cutout.fits`** - LoTSS 144 MHz data (512×512 pixels, ~2 MB)
+- **`UNK.AUTH-P-VLASS3.fits`** - VLASS 3 GHz data (~5 MB)
+- **`astron.fits`** - LoTSS 144 MHz data (~5 MB)
 - These are only 2 examples of data that can used, but FITS Files from other surveys like RACS Mid/Low, VLA First, TGSS, NVSS, etc, can be used but some of the attributes needs to be changed directly in the code. 
 
 These files contain the same sky region and demonstrate the complete analysis workflow. See [`data/README_data.md`](data/README_data.md) for detailed information about the sample data.
