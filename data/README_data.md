@@ -4,23 +4,23 @@ This folder contains small sample cutouts from real radio survey data for demons
 
 ## Files
 
-### `sample_vlass_cutout.fits`
-- **Survey**: Very Large Array Sky Survey (VLASS)  
+### `UNK.AUTH-P-VLASS3.fits`
+- **Survey**: Very Large Array Sky Survey 3.1 (VLASS)  
 - **Frequency**: 3 GHz (S-band)
 - **Angular Resolution**: ~2.5 arcsec
 - **Sensitivity**: ~120 μJy/beam RMS
+- **3σ Value**: 0.00021 Jy/beam
 - **Data Type**: Stokes I intensity map
-- **Region**: [Specify coordinates of your cutout]
-- **Size**: [e.g., 0.5° × 0.5°, 512×512 pixels]
+- **Size**: 60"
 
-### `sample_lotss_cutout.fits`
+### `astron.fits`
 - **Survey**: LOFAR Two-metre Sky Survey (LoTSS)
 - **Frequency**: 144 MHz (L-band)  
 - **Angular Resolution**: ~6 arcsec
 - **Sensitivity**: ~83 μJy/beam RMS
+- **3σ Value**: 0.00024 Jy/beam
 - **Data Type**: Stokes I intensity map
-- **Region**: [Same coordinates as VLASS cutout]
-- **Size**: [Matching coverage area]
+- **Size**: 60"
 
 ## Data Sources
 
@@ -42,29 +42,7 @@ This folder contains small sample cutouts from real radio survey data for demons
 ## Creating Your Own Cutouts
 
 If you want to create custom cutouts from full survey images:
-
-```python
-from astropy.io import fits
-from astropy import units as u
-from astropy.coordinates import SkyCoord
-from astropy.nddata import Cutout2D
-from astropy.wcs import WCS
-
-# Define target region
-center = SkyCoord('15h30m00s', '+45d00m00s', frame='icrs')
-size = 0.5 * u.deg  # 30 arcmin cutout
-
-# Load full survey image
-data = fits.getdata('full_survey_image.fits')
-header = fits.getheader('full_survey_image.fits')
-wcs = WCS(header)
-
-# Create cutout
-cutout = Cutout2D(data, center, size, wcs=wcs)
-
-# Save cutout
-fits.writeto('sample_cutout.fits', cutout.data, cutout.wcs.to_header())
-```
+- **Easiest Approach**- I will recomend using software like Aladin and DS9 to create cutcouts from larger survey data. 
 
 ## Expected Results
 
