@@ -1,149 +1,195 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Fri May 23 23:04:11 2025
 
-@author: adity
-"""
-
-# -*- coding: utf-8 -*-
-"""
-Created on Fri Jul 19 00:18:14 2024
-
-@author: adity
-"""
-
+import os
 import numpy as np
+import warnings
 from astropy.io import fits
 from astropy import units as u
 from astropy.wcs import WCS
+from astropy.stats import mad_std
 from radio_beam import Beam
-from astropy.convolution import convolve
 from reproject import reproject_interp
 
-def get_pixel_scale(header, wcs):
-    """
-    Extract pixel scale from FITS header, handling different WCS formats
-    """
-    try:
-        # Try CDELT2 first (traditional format)
-        if 'CDELT2' in header:
-            return abs(header['CDELT2']) * u.deg
-        # Try CD matrix format
-        elif 'CD2_2' in header:
-            return abs(header['CD2_2']) * u.deg
-        # Try PC matrix with CDELT
-        elif 'PC2_2' in header and 'CDELT2' in header:
-            return abs(header['PC2_2'] * header['CDELT2']) * u.deg
-        # Use WCS pixel scale calculation
+# Suppress warnings
+warnings.filterwarnings('ignore')
+
+class RadioMap:
+    def __init__(self, filepath, name="Map"):
+        self.filepath = filepath
+        self.name = name
+        self.data = None
+        self.header = None
+        self.wcs = None
+        self.beam = None
+        self.freq = None
+        
+        self.load_data()
+
+    def load_data(self):
+        if not os.path.exists(self.filepath):
+            raise FileNotFoundError(f"File not found: {self.filepath}")
+        
+        with fits.open(self.filepath) as hdul:
+            hdu = hdul[0] if len(hdul) > 0 and hdul[0].data is not None else hdul[1]
+            self.header = hdu.header
+            self.data = np.squeeze(hdu.data)
+            self.wcs = WCS(self.header).celestial
+            
+        print(f"\n--- Loaded {self.name} ---")
+        self._get_frequency()
+        self._get_beam()
+        self._check_units()
+
+    def _get_frequency(self):
+        keys = ['RESTFRQ', 'FREQ', 'CRVAL3'] 
+        found = False
+        for k in keys:
+            if k in self.header:
+                val = self.header[k]
+                if val > 1e6:
+                    self.freq = val * u.Hz
+                    print(f"  Freq: {self.freq.to(u.MHz):.2f}")
+                    found = True
+                    break
+        if not found:
+            val = float(input(f"  [!] Enter Frequency for {self.name} (MHz): "))
+            self.freq = val * u.MHz
+
+    def _get_beam(self):
+        try:
+            self.beam = Beam.from_fits_header(self.header)
+            print(f"  Beam: {self.beam}")
+        except:
+            print(f"  [!] Beam info missing in {self.name}.")
+            bmaj = float(input(f"  >>> Enter Major Axis (arcsec): "))
+            bmin = float(input(f"  >>> Enter Minor Axis (arcsec): "))
+            bpa = float(input(f"  >>> Enter PA (deg): "))
+            self.beam = Beam(major=bmaj*u.arcsec, minor=bmin*u.arcsec, pa=bpa*u.deg)
+
+    def _check_units(self):
+        """Detects mJy vs Jy and converts to Jy if needed."""
+        unit_str = self.header.get('BUNIT', '').lower()
+        
+        if 'mjy' in unit_str:
+            print("  [Correction] Converting mJy -> Jy")
+            self.data = self.data / 1000.0
+            self.header['BUNIT'] = 'Jy/beam'
+        elif 'jy' in unit_str:
+            pass 
         else:
-            pixel_scale = wcs.proj_plane_pixel_scales()[1]  # Get Y-axis pixel scale
-            return pixel_scale.to(u.deg)
-    except Exception as e:
-        print(f"Warning: Could not determine pixel scale from header: {e}")
-        # Fallback: calculate from WCS
-        pixel_scale = wcs.proj_plane_pixel_scales()[1]
-        return pixel_scale.to(u.deg)
+            print("  [!] Unit unknown. Assuming Jy/beam.")
+            is_mjy = input("  Is this map in mJy/beam? (y/n): ").lower()
+            if is_mjy == 'y':
+                self.data = self.data / 1000.0
 
-# Load FITS files
-vlass_file = r"D:\SOMU\SALTY LOTSS\FITS 1\P225+47\New Folder (11)\UNK.AUTH-P-VLASS3.fits"
-lotss_file = r"D:\SOMU\SALTY LOTSS\FITS 1\P225+47\New Folder (11)\astron.fits"
+def convolve_to_common(source_map, target_beam):
+    """Convolves map AND scales pixel flux for the new beam size."""
+    # Check if convolution is needed
+    if source_map.beam == target_beam:
+        print(f"  {source_map.name} already matches target beam.")
+        return source_map.data
 
-print("Loading FITS files...")
-vlass_data = fits.getdata(vlass_file)
-vlass_header = fits.getheader(vlass_file)
-vlass_wcs = WCS(vlass_header, naxis=2)
+    print(f"\n--- Convolving {source_map.name} ---")
+    print(f"  From: {source_map.beam}")
+    print(f"  To:   {target_beam}")
+    
+    try:
+        # 1. Calculate Kernel
+        kernel = target_beam.deconvolve(source_map.beam)
+        kernel_pix = kernel.as_kernel(source_map.wcs.proj_plane_pixel_area()**0.5)
+        
+        # 2. Convolve (FFT)
+        from astropy.convolution import convolve_fft
+        convolved_data = convolve_fft(source_map.data, kernel_pix, allow_huge=True)
+        
+        # 3. Apply Beam Area Scaling
+        source_area = source_map.beam.sr.value
+        target_area = target_beam.sr.value
+        scale_factor = target_area / source_area
+        
+        print(f"  [Physics] Scaling Factor: {scale_factor:.4f}")
+        return convolved_data * scale_factor
+        
+    except ValueError:
+        print("  [CRITICAL ERROR] Deconvolution failed despite Common Beam logic.")
+        return source_map.data
 
-lotss_data = fits.getdata(lotss_file)
-lotss_header = fits.getheader(lotss_file)
-lotss_wcs = WCS(lotss_header, naxis=2)
+def calculate_spectral_index_workflow():
+    print("========================================================")
+    print("   Spectral Index Pipeline (Common Resolution Method)   ")
+    print("========================================================")
 
-print(f"VLASS data shape: {vlass_data.shape}")
-print(f"LoTSS data shape: {lotss_data.shape}")
+    # 1. INPUTS
+    path1 = input("Enter path to FITS File 1: ").strip().replace('"', '')
+    path2 = input("Enter path to FITS File 2: ").strip().replace('"', '')
 
-# Handle extra dimensions
-if vlass_data.ndim > 2:
-    vlass_data = vlass_data[0, 0]
-    print("Reduced VLASS data to 2D")
+    map1 = RadioMap(path1, "Map 1")
+    map2 = RadioMap(path2, "Map 2")
 
-if lotss_data.ndim > 2:
-    lotss_data = lotss_data[0]
-    print("Reduced LoTSS data to 2D")
+    # 2. DEFINE COMMON BEAM (Worst Case)
+    # We find the largest axis in EITHER map and create a circular beam of that size.
+    # This guarantees both maps can be convolved to this resolution.
+    max_axis_1 = max(map1.beam.major, map1.beam.minor)
+    max_axis_2 = max(map2.beam.major, map2.beam.minor)
+    
+    # Add 1% buffer to ensure kernel is well-defined
+    common_size = max(max_axis_1, max_axis_2) * 1.01 
+    
+    common_beam = Beam(major=common_size, minor=common_size, pa=0*u.deg)
+    print(f"\n[Resolution] Defined Common Circular Beam: {common_beam.major.to(u.arcsec):.2f}")
 
-print(f"Final VLASS data shape: {vlass_data.shape}")
-print(f"Final LoTSS data shape: {lotss_data.shape}")
+    # 3. CONVOLVE BOTH MAPS
+    data1_conv = convolve_to_common(map1, common_beam)
+    data2_conv = convolve_to_common(map2, common_beam)
 
-# Reproject LoTSS to VLASS grid
-print("Reprojecting LoTSS to VLASS grid...")
-lotss_reprojected, _ = reproject_interp((lotss_data, lotss_wcs), vlass_wcs, vlass_data.shape)
+    # 4. REGRIDDING (Map 1 -> Map 2 Grid)
+    # Since both are now at the same resolution (common_beam), we can regrid safely.
+    print(f"\n--- Regridding Map 1 to Map 2 Grid (Order=3) ---")
+    
+    data1_aligned, footprint = reproject_interp(
+        (data1_conv, map1.wcs),
+        map2.wcs,
+        shape_out=map2.data.shape,
+        order=3
+    )
+    
+    # Now we use data1_aligned (Map 1 on Grid 2) and data2_conv (Map 2 on Grid 2)
 
-# Set beam information
-vlass_beam = Beam(major=2.5*u.arcsec, minor=2.5*u.arcsec, pa=0*u.deg)
-lotss_beam = Beam(major=5*u.arcsec, minor=5*u.arcsec, pa=0*u.deg)
+    # 5. NOISE & MASKING
+    print("\n--- Noise Characterization (MAD) ---")
+    rms_1 = mad_std(data1_aligned, ignore_nan=True)
+    rms_2 = mad_std(data2_conv, ignore_nan=True)
+    print(f"  Map 1 (Proc) RMS: {rms_1:.4e}")
+    print(f"  Map 2 (Proc) RMS: {rms_2:.4e}")
 
-# Convolve to common resolution
-target_beam = max(vlass_beam, lotss_beam)
-print(f"Target beam: {target_beam}")
+    sigma_thresh = float(input("\n>>> Enter Sigma Threshold (e.g., 3.0): "))
+    mask = (data1_aligned > sigma_thresh*rms_1) & (data2_conv > sigma_thresh*rms_2)
+    
+    # 6. CALCULATION
+    print("\n--- Calculating Alpha ---")
+    S1 = data1_aligned[mask]
+    S2 = data2_conv[mask]
+    v1 = map1.freq.to(u.Hz).value
+    v2 = map2.freq.to(u.Hz).value
+    
+    alpha_map = np.full_like(map2.data, np.nan)
+    
+    with np.errstate(invalid='ignore'):
+        alpha_vals = np.log10(S1 / S2) / np.log10(v1 / v2)
+        alpha_map[mask] = alpha_vals
 
-def convolve_if_needed(data, original_beam, target_beam, pixel_scale):
-    if target_beam > original_beam:
-        print(f"Convolving from {original_beam} to {target_beam}")
-        kernel = target_beam.deconvolve(original_beam).as_kernel(pixel_scale)
-        return convolve(data, kernel)
-    else:
-        print("No convolution needed")
-    return data
+    # 7. SAVE
+    print("\n--- Saving ---")
+    out_header = map2.header.copy()
+    
+    # Update header to reflect new common beam
+    try:
+        out_header.update(common_beam.to_header_keywords())
+        out_header['HISTORY'] = f'Convolved to common beam: {common_size.to(u.arcsec):.2f}'
+    except: pass
+    
+    fits.writeto('spidx_common.fits', alpha_map, out_header, overwrite=True)
+    print("  Saved: spidx_common.fits")
+    print("  Done.")
 
-# Get pixel scale using the improved function
-vlass_pixel_scale = get_pixel_scale(vlass_header, vlass_wcs)
-print(f"VLASS pixel scale: {vlass_pixel_scale}")
-
-print("Convolving data to common resolution...")
-vlass_conv = convolve_if_needed(vlass_data, vlass_beam, target_beam, vlass_pixel_scale)
-lotss_conv = convolve_if_needed(lotss_reprojected, lotss_beam, target_beam, vlass_pixel_scale)
-
-# Apply noise threshold
-vlass_threshold = 0.00021
-lotss_threshold = 0.00024
-
-print("Applying noise thresholds...")
-vlass_conv[vlass_conv < vlass_threshold] = 0
-lotss_conv[lotss_conv < lotss_threshold] = 0
-
-# Calculate spectral index
-vlass_freq = 3000  # MHz
-lotss_freq = 144  # MHz
-
-print("Calculating spectral index...")
-with np.errstate(divide='ignore', invalid='ignore'):
-    spectral_index = np.log(vlass_conv / lotss_conv) / np.log(vlass_freq / lotss_freq)
-    spectral_index[np.isnan(spectral_index)] = 0
-    spectral_index[np.isinf(spectral_index)] = 0  # Also handle infinite values
-
-# Print some statistics
-valid_pixels = spectral_index[spectral_index != 0]
-if len(valid_pixels) > 0:
-    print(f"Spectral index statistics:")
-    print(f"  Valid pixels: {len(valid_pixels)}")
-    print(f"  Mean: {np.mean(valid_pixels):.3f}")
-    print(f"  Median: {np.median(valid_pixels):.3f}")
-    print(f"  Std: {np.std(valid_pixels):.3f}")
-    print(f"  Range: {np.min(valid_pixels):.3f} to {np.max(valid_pixels):.3f}")
-else:
-    print("Warning: No valid spectral index values calculated!")
-
-# Create a new FITS file
-print("Creating output FITS file...")
-hdu = fits.PrimaryHDU(spectral_index, header=vlass_header)
-
-# Add some metadata to the header
-hdu.header['OBJECT'] = 'Spectral Index Map'
-hdu.header['BUNIT'] = 'dimensionless'
-hdu.header['COMMENT'] = f'Spectral index between {vlass_freq} MHz and {lotss_freq} MHz'
-hdu.header['VFREQ'] = (vlass_freq, 'VLASS frequency in MHz')
-hdu.header['LFREQ'] = (lotss_freq, 'LoTSS frequency in MHz')
-hdu.header['VTHRESH'] = (vlass_threshold, 'VLASS noise threshold')
-hdu.header['LTHRESH'] = (lotss_threshold, 'LoTSS noise threshold')
-
-hdu.writeto('spectral_index.fits', overwrite=True)
-
-print("Spectral index FITS file created: spectral_index.fits")
+if __name__ == "__main__":
+    calculate_spectral_index_workflow()
